@@ -1,12 +1,15 @@
 #!/bin/bash
 
-amount=$#
-avg=0
-for i in {0..$amount}
+sum=0
+count=$#
+
+for param in "$@"
 do
-    echo $i
-    avg=$avg+$i
+    #echo "$param"
+    sum=$((sum + param))
 done
-avg=$avg/$#
-echo "Total Number of Parameters: $#"
-echo "Total avg: $avg"
+
+avg=$((sum / count))
+#echo "cnt: $count"
+echo "sum: $sum"
+echo "avg: $avg"
