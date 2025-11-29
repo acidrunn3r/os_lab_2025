@@ -4,7 +4,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-
 #include <getopt.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
@@ -12,6 +11,7 @@
 #include <sys/types.h>
 
 #include "pthread.h"
+#include <multmodulo.h>
 
 struct FactorialArgs {
   uint64_t begin;
@@ -19,30 +19,21 @@ struct FactorialArgs {
   uint64_t mod;
 };
 
-uint64_t MultModulo(uint64_t a, uint64_t b, uint64_t mod) {
-  uint64_t result = 0;
-  a = a % mod;
-  while (b > 0) {
-    if (b % 2 == 1)
-      result = (result + a) % mod;
-    a = (a * 2) % mod;
-    b /= 2;
-  }
-
-  return result % mod;
-}
 
 uint64_t Factorial(const struct FactorialArgs *args) {
   uint64_t ans = 1;
-
-  // TODO: your code here
-
+//считаем частичные факториалы
+  for(uint64_t i = (*args).begin; i <= (*args).end; i++){
+    ans = MultModulo(ans, i, (*args).mod);
+  }
   return ans;
 }
 
 void *ThreadFactorial(void *args) {
   struct FactorialArgs *fargs = (struct FactorialArgs *)args;
-  return (void *)(uint64_t *)Factorial(fargs);
+  uint64_t *res = malloc(sizeof(uint64_t));
+  *res = Factorial(fargs);
+  return res;
 }
 
 int main(int argc, char **argv) {
@@ -157,11 +148,15 @@ int main(int argc, char **argv) {
       fprintf(stdout, "Receive: %llu %llu %llu\n", begin, end, mod);
 
       struct FactorialArgs args[tnum];
+      uint64_t length = end - begin + 1; 
+      uint64_t chunk = length / tnum; 
+      uint64_t rem = length % tnum; 
+      uint64_t cur = begin;
       for (uint32_t i = 0; i < tnum; i++) {
-        // TODO: parallel somehow
-        args[i].begin = 1;
-        args[i].end = 1;
-        args[i].mod = mod;
+        args[i].begin = cur; 
+        args[i].end = cur + chunk - 1 + (i < rem ? 1 : 0); 
+        args[i].mod = mod; 
+        cur = args[i].end + 1;
 
         if (pthread_create(&threads[i], NULL, ThreadFactorial,
                            (void *)&args[i])) {
@@ -172,9 +167,11 @@ int main(int argc, char **argv) {
 
       uint64_t total = 1;
       for (uint32_t i = 0; i < tnum; i++) {
-        uint64_t result = 0;
-        pthread_join(threads[i], (void **)&result);
-        total = MultModulo(total, result, mod);
+        void *res;
+        pthread_join(threads[i], &res);
+        uint64_t value = *(uint64_t *)res;
+        free(res);
+        total = MultModulo(total, value, mod);
       }
 
       printf("Total: %llu\n", total);
@@ -187,7 +184,6 @@ int main(int argc, char **argv) {
         break;
       }
     }
-
     shutdown(client_fd, SHUT_RDWR);
     close(client_fd);
   }
